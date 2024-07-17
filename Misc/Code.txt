@@ -1,0 +1,702 @@
+from google.colab import drive
+drive.mount('/content/drive')
+import pandas as pd
+import numpy as np
+import matplotlib.pylab as plt
+import seaborn as sns
+
+from glob import glob
+
+import librosa
+import librosa.display
+import IPython.display as ipd
+
+from itertools import cycle
+
+audio_files = glob('/content/drive/MyDrive/Colab Notebooks/data/SentimentAnalysisDataset/NoiseAudioWAV/*.wav')
+# audio_files = glob('https://drive.google.com/drive/folders/15mvUVb15ThHLBFr33sfEhWaQ-uXWt265?usp=sharing')
+audio_files
+y, sr = librosa.load(audio_files[0])
+
+pd.Series(y).plot()
+!pip install noisereduce
+from scipy.io import wavfile
+import noisereduce as nr
+# load data
+rate, data = wavfile.read(audio_files[0])
+# perform noise reduction
+reduced_noise = nr.reduce_noise(y=data, sr=rate)
+wavfile.write("mywav_reduced_noise.wav", rate, reduced_noise)
+ipd.Audio("mywav_reduced_noise.wav")
+# Cleaning all the audios
+count = 0
+for dir in audio_files:
+  temp = dir.split('/')
+  files = temp[-1]
+  # print(files)
+
+  rate, data = wavfile.read(dir)
+  # perform noise reduction
+  reduced_noise = nr.reduce_noise(y=data, sr=rate)
+  wavfile.write(dir, rate, reduced_noise)
+  count = count + 1
+  print(count)
+We have overwritted the original audio, so can refer using the same placeholder audio_files
+ipd.Audio(audio_files[3])
+y, sr = librosa.load(audio_files[0])
+pd.Series(y).plot()
+y, sr = librosa.load(audio_files[0])
+print("y: " + str(y[:10]))
+print("y shape: " + str(y.shape))
+print("Sr: " + str(sr))
+import os
+Crema = '/content/drive/MyDrive/Colab Notebooks/data/SentimentAnalysisDataset/NoiseAudioWAV/'
+crema_directory_list = os.listdir(Crema)
+
+file_emotion = []
+file_path = []
+
+for file in crema_directory_list:
+    # storing file paths
+    file_path.append(Crema + file)
+    # storing file emotions
+    part=file.split('_')
+    if part[2] == 'SAD':
+        file_emotion.append('sad')
+    elif part[2] == 'ANG':
+        file_emotion.append('angry')
+    elif part[2] == 'DIS':
+        file_emotion.append('disgust')
+    elif part[2] == 'FEA':
+        file_emotion.append('fear')
+    elif part[2] == 'HAP':
+        file_emotion.append('happy')
+    elif part[2] == 'NEU':
+        file_emotion.append('neutral')
+    else:
+        file_emotion.append('Unknown')
+        
+# dataframe for emotion of files
+emotion_df = pd.DataFrame(file_emotion, columns=['Emotions'])
+
+# dataframe for path of files.
+path_df = pd.DataFrame(file_path, columns=['Path'])
+Crema_df = pd.concat([emotion_df, path_df], axis=1)
+Crema_df.head()
+#Crema
+fname = Crema+'1001_IEO_FEA_MD.wav'
+data, sampling_rate = librosa.load(fname)
+plt.figure(figsize=(15, 5))
+
+pd.Series(data).plot()
+
+# Lets play the audio 
+ipd.Audio(fname)
+Crema_df.to_csv("Crema_df.csv",index=False)
+Crema_df
+Crema_df["Emotions"].value_counts()
+plt.title('Count of Emotions')
+plt.hist(Crema_df.Emotions)
+plt.ylabel('Count')
+plt.xlabel('Emotions')
+plt.show()
+path = np.array(Crema_df.Path[Crema_df.Emotions=='fear'])[1]
+path
+def create_waveplot(data, sr, e):
+    plt.figure(figsize=(10, 3))
+    plt.title('Waveplot for audio with {} emotion'.format(e), size=15)
+    librosa.display.waveshow(data, sr=sr)
+    plt.show()
+
+def create_spectrogram(data, sr, e):
+    X = librosa.stft(data)
+    Xdb = librosa.amplitude_to_db(abs(X))
+    plt.figure(figsize=(12, 3))
+    plt.title('Spectrogram for audio with {} emotion'.format(e), size=15)
+    librosa.display.specshow(Xdb, sr=sr, x_axis='time', y_axis='hz')   
+    plt.colorbar()
+emotion='fear'
+path = np.array(Crema_df.Path[Crema_df.Emotions==emotion])[1]
+data, sampling_rate = librosa.load(path)
+create_waveplot(data, sampling_rate, emotion)
+create_spectrogram(data, sampling_rate, emotion)
+ipd.Audio(path)
+emotion='angry'
+path = np.array(Crema_df.Path[Crema_df.Emotions==emotion])[1]
+data, sampling_rate = librosa.load(path)
+create_waveplot(data, sampling_rate, emotion)
+create_spectrogram(data, sampling_rate, emotion)
+ipd.Audio(path)
+emotion='sad'
+path = np.array(Crema_df.Path[Crema_df.Emotions==emotion])[1]
+data, sampling_rate = librosa.load(path)
+create_waveplot(data, sampling_rate, emotion)
+create_spectrogram(data, sampling_rate, emotion)
+ipd.Audio(path)
+emotion='happy'
+path = np.array(Crema_df.Path[Crema_df.Emotions==emotion])[1]
+data, sampling_rate = librosa.load(path)
+create_waveplot(data, sampling_rate, emotion)
+create_spectrogram(data, sampling_rate, emotion)
+ipd.Audio(path)
+# Data Augmentation
+
+def noise(data):
+    noise_amp = 0.035*np.random.uniform()*np.amax(data)
+    data = data + noise_amp*np.random.normal(size=data.shape[0])
+    return data
+
+def stretch(data, rate=0.8):
+    return librosa.effects.time_stretch(data, rate=rate)
+
+def shift(data):
+    shift_range = int(np.random.uniform(low=-5, high = 5)*1000)
+    return np.roll(data, shift_range)
+
+def pitch(data, sampling_rate, pitch_factor=0.7):
+    return librosa.effects.pitch_shift(data, sr=sampling_rate, n_steps=int(pitch_factor * 12))
+    
+# taking any example and checking for techniques.
+path = np.array(Crema_df.Path)[1]
+SAMPLE_RATE = 22050
+data, _ = librosa.load(path, sr=SAMPLE_RATE)
+##### 1. Simple Audio
+plt.figure(figsize=(14,4))
+plt.plot(data)
+ipd.Audio(path)
+##### 2. Noise Entered
+x = noise(data)
+plt.figure(figsize=(14,4))
+plt.plot(x)
+ipd.Audio(x, rate=SAMPLE_RATE)
+##### 3. Sampling
+x = stretch(data)
+plt.figure(figsize=(14,4))
+plt.plot(x)
+ipd.Audio(x, rate=SAMPLE_RATE)
+4. Shifting
+x = shift(data)
+plt.figure(figsize=(14,4))
+plt.plot(x)
+ipd.Audio(x, rate=SAMPLE_RATE)
+##### 5. Pitch
+x = pitch(data, SAMPLE_RATE)
+plt.figure(figsize=(14,4))
+plt.plot(x)
+ipd.Audio(x, rate=SAMPLE_RATE)
+# Feature Extraction  
+- Zero Crossing Rate  
+- Chroma_stft  
+- MFCC  
+- RMS(root mean square) value  
+- MelSpectogram to train our model.  
+import sys
+
+import warnings
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.model_selection import train_test_split
+def extract_features(data):
+    # Zero Crossing Rate
+    result = np.array([])
+    zcr = np.mean(librosa.feature.zero_crossing_rate(y=data).T, axis=0)
+    result=np.hstack((result, zcr)) # stacking horizontally
+
+    # Chroma_stft
+    stft = np.abs(librosa.stft(data))
+    chroma_stft = np.mean(librosa.feature.chroma_stft(S=stft, sr=SAMPLE_RATE).T, axis=0)
+    result = np.hstack((result, chroma_stft)) # stacking horizontally
+
+    # MFCC
+    mfcc = np.mean(librosa.feature.mfcc(y=data, sr=SAMPLE_RATE).T, axis=0)
+    result = np.hstack((result, mfcc)) # stacking horizontally
+
+    # Root Mean Square
+    rms = np.mean(librosa.feature.rms(y=data).T, axis=0)
+    result = np.hstack((result, rms)) # stacking horizontally
+
+    # MelSpectogram for the training of model
+    mel = np.mean(librosa.feature.melspectrogram(y=data, sr=SAMPLE_RATE).T, axis=0)
+    result = np.hstack((result, mel)) # stacking horizontally
+    
+    return np.array(result)
+
+def load_file(path):
+    # duration and offset are used to take care of the no audio in start and the ending of each audio files as seen above.
+    data, _ = librosa.load(path, duration=2.5, offset=0.6, sr=SAMPLE_RATE)
+    
+    return data
+
+def augment_and_extract_features(path):
+    data = load_file(path)
+
+    # without augmentation
+    res1 = extract_features(data)
+    result = np.vstack((np.array(res1), ))
+    
+    # data with noise
+    noise_data = noise(data)
+    res2 = extract_features(noise_data)
+    result = np.vstack((result, res2)) # stacking vertically
+    
+    # data with stretching and pitching
+    new_data = stretch(data)
+    data_stretch_pitch = pitch(new_data, SAMPLE_RATE)
+    res3 = extract_features(data_stretch_pitch)
+    result = np.vstack((result, res3)) # stacking vertically
+    
+    return result
+from tqdm import tqdm
+
+X_path, y_emotion = Crema_df.Path, Crema_df.Emotions
+x_train_path, x_test_path, y_train_emotion, y_test_emotion = train_test_split(X_path, y_emotion, random_state=0, shuffle=True)
+X_train, y_train = [], []
+
+for path, emotion in tqdm(zip(x_train_path, y_train_emotion)):
+    feature = augment_and_extract_features(path)
+    for ele in feature:
+        X_train.append(ele)
+        y_train.append(emotion)
+X_test, y_test = [], []
+
+for path, emotion in tqdm(zip(x_test_path, y_test_emotion)):
+    feature = augment_and_extract_features(path)
+    for ele in feature:
+        X_test.append(ele)
+        y_test.append(emotion)
+len(X_train), len(y_train), Crema_df.Path.shape
+# Data Preperation
+import keras
+from keras.callbacks import ReduceLROnPlateau
+from keras.models import Sequential
+from keras.layers import Dense, Conv1D, MaxPooling1D, Flatten, Dropout, BatchNormalization
+from keras.utils import np_utils, to_categorical
+from keras.callbacks import ModelCheckpoint
+# As this is a multiclass classification problem onehotencoding our Y.
+encoder = OneHotEncoder()
+y_train = encoder.fit_transform(np.array(y_train).reshape(-1,1)).toarray()
+y_test = encoder.fit_transform(np.array(y_test).reshape(-1,1)).toarray()
+# scaling our data with sklearn's Standard scaler
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+X_train.shape, y_train.shape, X_test.shape, y_test.shape
+# making our data compatible to model.
+X_train = np.expand_dims(X_train, axis=2)
+X_test = np.expand_dims(X_test, axis=2)
+X_train.shape, y_train.shape, X_test.shape, y_test.shape
+# Modeling
+model=Sequential()
+model.add(Conv1D(256, kernel_size=5, strides=1, padding='same', activation='relu', input_shape=(X_train.shape[1], 1)))
+model.add(MaxPooling1D(pool_size=5, strides = 2, padding = 'same'))
+
+model.add(Conv1D(256, kernel_size=5, strides=1, padding='same', activation='relu'))
+model.add(MaxPooling1D(pool_size=5, strides = 2, padding = 'same'))
+
+model.add(Conv1D(128, kernel_size=5, strides=1, padding='same', activation='relu'))
+model.add(MaxPooling1D(pool_size=5, strides = 2, padding = 'same'))
+model.add(Dropout(0.2))
+
+model.add(Conv1D(64, kernel_size=5, strides=1, padding='same', activation='relu'))
+model.add(MaxPooling1D(pool_size=5, strides = 2, padding = 'same'))
+
+model.add(Flatten())
+model.add(Dense(units=32, activation='relu'))
+model.add(Dropout(0.3))
+
+model.add(Dense(units=6, activation='softmax'))
+model.compile(optimizer = 'adam' , loss = 'categorical_crossentropy' , metrics = ['accuracy'])
+
+model.summary()
+rlrp = ReduceLROnPlateau(monitor='loss', factor=0.4, verbose=0, patience=2, min_lr=0.0000001)
+history=model.fit(X_train, y_train, batch_size=64, epochs=50, validation_data=(X_test, y_test), callbacks=[rlrp])
+print("Accuracy of our model on test data : " , model.evaluate(X_test,y_test)[1]*100 , "%")
+
+epochs = [i for i in range(50)]
+fig , ax = plt.subplots(1,2)
+train_acc = history.history['accuracy']
+train_loss = history.history['loss']
+test_acc = history.history['val_accuracy']
+test_loss = history.history['val_loss']
+
+fig.set_size_inches(20,6)
+ax[0].plot(epochs , train_loss , label = 'Training Loss')
+ax[0].plot(epochs , test_loss , label = 'Testing Loss')
+ax[0].set_title('Training & Testing Loss')
+ax[0].legend()
+ax[0].set_xlabel("Epochs")
+
+ax[1].plot(epochs , train_acc , label = 'Training Accuracy')
+ax[1].plot(epochs , test_acc , label = 'Testing Accuracy')
+ax[1].set_title('Training & Testing Accuracy')
+ax[1].legend()
+ax[1].set_xlabel("Epochs")
+plt.show()
+# predicting on test data.
+pred_test = model.predict(X_test)
+y_pred = encoder.inverse_transform(pred_test)
+
+y_test = encoder.inverse_transform(y_test)
+df = pd.DataFrame(columns=['Predicted Labels', 'Actual Labels'])
+df['Predicted Labels'] = y_pred.flatten()
+df['Actual Labels'] = y_test.flatten()
+
+df.head(10)
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize = (12, 10))
+cm = pd.DataFrame(cm , index = [i for i in encoder.categories_] , columns = [i for i in encoder.categories_])
+sns.heatmap(cm, linecolor='white', cmap='Blues', linewidth=1, annot=True, fmt='')
+plt.title('Confusion Matrix', size=20)
+plt.xlabel('Predicted Labels', size=14)
+plt.ylabel('Actual Labels', size=14)
+plt.show()
+print(classification_report(y_test, y_pred))
+# Compute precision and recall scores
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+# Compute precision and recall scores
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Print precision and recall scores
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+
+
+
+from google.colab import drive
+drive.mount('/content/drive', force_remount=True)
+import pandas as pd
+import os
+import numpy as np
+import matplotlib.pylab as plt
+import seaborn as sns
+
+from glob import glob
+
+import librosa
+import librosa.display
+import IPython.display as ipd
+
+from itertools import cycle
+
+audio_files = glob('/content/drive/MyDrive/Colab Notebooks/data/SentimentAnalysisDataset/NoiseAudioWAV/*.wav')
+# audio_files = glob('https://drive.google.com/drive/folders/15mvUVb15ThHLBFr33sfEhWaQ-uXWt265?usp=sharing')
+audio_files
+## Data Preparation
+Crema = '/content/drive/MyDrive/Colab Notebooks/data/SentimentAnalysisDataset/NoiseAudioWAV/'
+crema_directory_list = os.listdir(Crema)
+
+file_emotion = []
+file_path = []
+
+for file in crema_directory_list:
+    # storing file paths
+    file_path.append(Crema + file)
+    # storing file emotions
+    part=file.split('_')
+    if part[2] == 'SAD':
+        file_emotion.append('sad')
+    elif part[2] == 'ANG':
+        file_emotion.append('angry')
+    elif part[2] == 'DIS':
+        file_emotion.append('disgust')
+    elif part[2] == 'FEA':
+        file_emotion.append('fear')
+    elif part[2] == 'HAP':
+        file_emotion.append('happy')
+    elif part[2] == 'NEU':
+        file_emotion.append('neutral')
+    else:
+        file_emotion.append('Unknown')
+        
+# dataframe for emotion of files
+emotion_df = pd.DataFrame(file_emotion, columns=['Emotions'])
+
+# dataframe for path of files.
+path_df = pd.DataFrame(file_path, columns=['Path'])
+Crema_df = pd.concat([emotion_df, path_df], axis=1)
+Crema_df.head()
+Crema_df.to_csv("Crema_df.csv",index=False)
+Crema_df
+Crema_df["Emotions"].value_counts()
+path = np.array(Crema_df.Path[Crema_df.Emotions=='fear'])[1]
+path
+import os
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
+# Function to extract features from audio files
+def extract_features(file_path):
+    # Load audio file
+    audio, sr = librosa.load(file_path, sr=None)
+    
+    # Extract features
+    features = []
+    
+    # Example feature extraction (MFCC)
+    mfcc = librosa.feature.mfcc(y=audio, sr=sr)
+    features.append(np.mean(mfcc))
+    features.append(np.std(mfcc))
+    
+    return features
+
+# Extract features and create feature matrix X
+X = np.array([extract_features(file) for file in audio_files])
+
+# Create target variable y
+y = (Crema_df.Emotions).to_numpy()
+### Logistic Regression Model
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import accuracy_score
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+# Create a feature scaler
+scaler = StandardScaler()
+
+# Scale the feature matrix X
+X_scaled = scaler.fit_transform(X)
+
+# Split the scaled data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# Initialize logistic regression model
+logistic_regression = LogisticRegression()
+
+# Train the model
+logistic_regression.fit(X_train, y_train)
+
+
+# Predict labels for the test set
+y_pred = logistic_regression.predict(X_test)
+
+# Evaluate the model
+accuracy = logistic_regression.score(X_test, y_test)
+print("Accuracy:", accuracy)
+
+# Compute precision and recall scores
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Print precision and recall scores
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+
+# Confusion matrix for Logistic Regression
+cm_lr = confusion_matrix(y_test, y_pred)
+
+# Classification report for Logistic Regression
+classification_report_lr = classification_report(y_test, y_pred, zero_division=1)
+
+# Plot confusion matrix for Logistic Regression
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm_lr, annot=True, fmt="d", cmap="Blues", cbar=False)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix - Logistic Regression")
+plt.show()
+
+# Print classification report for Logistic Regression
+print("Classification Report - Logistic Regression:")
+print(classification_report_lr)
+### KNN
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+
+def extract_features(file_path):
+    audio, sr = librosa.load(file_path, sr=None)
+    
+    features = []
+    
+    # Fourier Transform
+    spectrum = np.abs(librosa.stft(audio))
+    features.extend(np.mean(spectrum, axis=1))
+    features.extend(np.std(spectrum, axis=1))
+    
+    # Mel-frequency cepstral coefficients (MFCCs)
+    mfcc = librosa.feature.mfcc(y=audio, sr=sr)
+    features.extend(np.mean(mfcc, axis=1))
+    features.extend(np.std(mfcc, axis=1))
+    
+    # Melspectrogram
+    melspectrogram = librosa.feature.melspectrogram(y=audio, sr=sr)
+    features.extend(np.mean(melspectrogram, axis=1))
+    features.extend(np.std(melspectrogram, axis=1))
+    
+    # Chromagram
+    chromagram = librosa.feature.chroma_stft(y=audio, sr=sr)
+    features.extend(np.mean(chromagram, axis=1))
+    features.extend(np.std(chromagram, axis=1))
+    
+    # # Bicoherence
+    # bicoherence = librosa.feature.spectral_bicoherence(y=audio, sr=sr)
+    # features.extend(np.mean(bicoherence, axis=(0, 1)))
+    # features.extend(np.var(bicoherence, axis=(0, 1)))
+    # features.extend(np.mean(np.abs(bicoherence), axis=(0, 1)))
+    # features.extend(np.std(np.abs(bicoherence), axis=(0, 1)))
+    
+    # Spectral centroid
+    centroid = librosa.feature.spectral_centroid(y=audio, sr=sr)
+    features.append(np.mean(centroid))
+    
+    # Spectral bandwidth
+    bandwidth = librosa.feature.spectral_bandwidth(y=audio, sr=sr)
+    features.append(np.max(bandwidth) - np.min(bandwidth))
+    
+    # Spectral contrast
+    contrast = librosa.feature.spectral_contrast(y=audio, sr=sr)
+    features.append(np.mean(contrast))
+    
+    return features
+
+
+# Extract features and create feature matr  ix X
+X = np.array([extract_features(file) for file in audio_files])
+
+# Create target variable y
+y = (Crema_df.Emotions).to_numpy()
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Initialize KNN classifier
+knn = KNeighborsClassifier(n_neighbors=5)
+
+# Train the classifier
+knn.fit(X_train, y_train)
+
+# Predict labels for the test set
+y_pred = knn.predict(X_test)
+
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+# Compute precision and recall scores
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Print precision and recall scores
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+
+# Create confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Plot confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show()
+
+# Classification report
+classification_report = classification_report(y_test, y_pred)
+print("Classification Report:")
+print(classification_report)
+
+### Naive Bayes
+from sklearn.naive_bayes import GaussianNB
+
+# Using the same Training/Testing data From KNN
+# Initialize Naive Bayes classifier
+nb = GaussianNB()
+
+# Train the classifier
+nb.fit(X_train, y_train)
+
+# Predict labels for the test set
+y_pred = nb.predict(X_test)
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+# Compute precision and recall scores
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Print precision and recall scores
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Create confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Plot confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show()
+
+# Classification report
+report = classification_report(y_test, y_pred)
+print("Classification Report:")
+print(report)
+
+### SVM
+from sklearn.svm import SVC
+
+svm = SVC()
+
+# Train the classifier
+svm.fit(X_train, y_train)
+
+# Predict labels for the test set
+y_pred = svm.predict(X_test)
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+# Compute precision and recall scores
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Print precision and recall scores
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+# Create confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Create classification report
+report = classification_report(y_test, y_pred)
+
+# Visualize confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.title("Confusion Matrix")
+plt.show()
+
+# Print classification report
+print("Classification Report:")
+print(report)
+
+  
